@@ -7,6 +7,38 @@ from sqlalchemy import create_engine
 
 from utilerias import concatenar_formato_bd, generar_archivo
 
+headers = ['No.', 'FOLIO', 'rfc', 'nombre', 'plaza', 'Sindicato', 'QNA DE INI'
+           ]
+
+
+class FormatoLayoutExcelException(Exception):
+    """Excepción lanzada cuando el formato del excel introducido es diferente al que se debe usar.
+
+    Attributes:
+        formato_recibido — columnas que se recibieron en el archivo
+        message — explicación del error
+    """
+
+    def campos_a_texto(self, headers):
+        campos = ''
+        for i in headers:
+            if i == len(headers):
+                campos += f"'{i}'"
+            else:
+                campos += f"'{i}',"
+        return campos
+
+    def __init__(self, formato_recibido):
+        self.formato_recibido = formato_recibido
+        self.message = f'El layout recibido es incorrecto se introdujo las columnas: ' \
+                       f'{self.campos_a_texto(self.formato_recibido)}\n' \
+                       f'las columnas correctas son: {self.campos_a_texto(headers)}'
+
+    def __str__(self):
+        return self.message
+
+    pass
+
 
 def generar_archivos_ss(qna, archivo):
     config = configparser.ConfigParser()
@@ -15,6 +47,8 @@ def generar_archivos_ss(qna, archivo):
     # lee la relación a cargar
     relacion_ss = pandas.read_excel(archivo)
     # genera la conexión a la base de datos.
+    if not relacion_ss.columns.tolist() == headers:
+        raise FormatoLayoutExcelException(relacion_ss.columns)
 
     try:
         engine = create_engine(f"mysql+pymysql://{config['ConexionDB']['db_user']}"
@@ -66,5 +100,11 @@ def generar_archivos_ss(qna, archivo):
                 f"no se pudo generar el archivo 'reporte_ss_{qna_proceso}_salida.xlsx, "
                 f"posiblemente el archivo se encuentre abierto")
         generar_archivo(f'salidas/carga_ss_{qna_proceso}.txt', texto_carga)
-        print(f'generados {len(pendientes)} registros para cargar en el sistema'
-              f' en el archivo salidas/carga_ss_{qna_proceso}.txt')
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setText("Registros generados")
+        msg.setInformativeText(
+            f'generados {len(pendientes)} registros para cargar en el sistema\n Lo puedes consultar el archivo'
+            f' salidas/carga_ss_{qna_proceso}.txt')
+        msg.setWindowTitle("Acción Exitosa!")
+        msg.exec_()
